@@ -14,5 +14,17 @@
           format_sql: true
       show-sql: true
 
+    kafka:
+      bootstrap-servers: localhost:9092
+      producer:
+        key-serializer: org.apache.kafka.common.serialization.StringSerializer
+        value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+        properties:
+          spring.json.add.type.headers: false
+
+  app:
+    kafka:
+      topic: messages-topic
+
   server:
     port: 8080
