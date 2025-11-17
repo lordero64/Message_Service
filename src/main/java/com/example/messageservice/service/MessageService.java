@@ -1,15 +1,18 @@
 package com.example.messageservice.service;
 
-import com.example.messageservice.config.KafkaMessageService;
 import com.example.messageservice.dto.KafkaMessageDto;
 import com.example.messageservice.dto.MessageDto;
 import com.example.messageservice.entity.Message;
+import com.example.messageservice.entity.OutboxMessage;
 import com.example.messageservice.repository.MessageRepository;
+import com.example.messageservice.repository.OutboxRepository;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.List;
 
@@ -19,8 +22,15 @@ public class MessageService {
     @Autowired
     private MessageRepository messageRepository;
 
+    //Не используется из-за паттерна outbox
+//    @Autowired
+//    private KafkaMessageService kafkaMessageService;
+
     @Autowired
-    private KafkaMessageService kafkaMessageService;
+    private OutboxRepository outboxRepository;
+
+    @Autowired
+    private ObjectMapper objectMapper;
     private static final Logger logger = LoggerFactory.getLogger(MessageService.class);
 
     @Transactional
@@ -32,18 +42,41 @@ public class MessageService {
 
         logger.info("Сообщение сохранено в БД с ID: {}", savedMessage.getId());
 
+        // Простое сохранение в Kafka
+//        try {
+//            KafkaMessageDto kafkaMessage = new KafkaMessageDto(savedMessage.getId(),
+//                    savedMessage.getContent(),
+//                    savedMessage.getCreatedAt());
+//
+//            kafkaMessageService.sendMessageSync(kafkaMessage);
+//            logger.info("Сообщение отправлено в Kafka: {}", savedMessage.getId());
+//
+//        } catch (Exception e) {
+//            logger.error("Ошибка при отправке в Kafka для сообщения ID: {}", savedMessage.getId(), e);
+//        }
+
+        // Outbox pattern
         try {
             KafkaMessageDto kafkaMessage = new KafkaMessageDto(savedMessage.getId(),
                     savedMessage.getContent(),
                     savedMessage.getCreatedAt());
 
-            kafkaMessageService.sendMessageSync(kafkaMessage);
-            logger.info("Сообщение отправлено в Kafka: {}", savedMessage.getId());
+            // Сериализуем в JSON
+            String payload = objectMapper.writeValueAsString(kafkaMessage);
 
-        } catch (Exception e) {
-            logger.error("Ошибка при отправке в Kafka для сообщения ID: {}", savedMessage.getId(), e);
+            // Сохраняем в outbox
+            OutboxMessage outboxMessage = new OutboxMessage(
+                    message.getId(),
+                    "MESSAGE_CREATED",
+                    payload
+            );
+            outboxRepository.save(outboxMessage);
+            logger.info("Outbox сообщение создано для message ID: {}", message.getId());
+
+        } catch (JsonProcessingException e) {
+            logger.error("Ошибка сериализации события для message ID: {}", message.getId(), e);
+            throw new RuntimeException("Failed to create outbox message", e);
         }
-
         return savedMessage;
     }
 
