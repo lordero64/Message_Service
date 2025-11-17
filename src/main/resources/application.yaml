@@ -24,7 +24,22 @@
 
   app:
     kafka:
-      topic: messages-topic
+      topic:
+        messages: messages-topic
+        dlx: messages-dlx
+    outbox:
+      processor:
+        interval: 15000 # 15 seconds
+      stuck-messages:
+        interval: 300000 # 5 minutes
+      cleanup:
+        cron: "0 0 2 * * ?" # Every day at 2:00 AM
+
 
   server:
     port: 8080
+
+  logging:
+    level:
+      com.example.messageservice: DEBUG
+      org.springframework.kafka: INFO
