@@ -59,4 +59,6 @@ public class KafkaMessageDto {
                 ", eventType='" + eventType + '\'' +
                 '}';
     }
+
+
 }
